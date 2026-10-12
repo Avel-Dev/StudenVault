@@ -5,6 +5,12 @@ import { apiFetch } from '../../../api/client';
 import { SubjectsPane } from './SubjectsPane';
 import { ModulesPane } from './ModulesPane';
 import { NotesPane } from './NotesPane';
+import { SubjectFormModal } from './SubjectFormModal';
+import { ModuleFormModal } from './ModuleFormModal';
+import { UploadNoteModal } from './UploadNoteModal';
+import { EditNoteModal } from './EditNoteModal';
+import { ConfirmDialog } from '../../../components/ConfirmDialog';
+import { Toast } from '../../../components/Toast';
 import {
   BookOpen,
   ChevronRight,
@@ -145,6 +151,235 @@ export const NotesBrowser = () => {
       return String(id) === String(moduleId);
     });
   }, [moduleId, subjectNotes]);
+
+  // Check admin role
+  const isAdmin = user?.role === 'admin';
+
+  // Admin modals & feedback state
+  const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false);
+  const [editingSubject, setEditingSubject] = useState(null);
+
+  const [isModuleModalOpen, setIsModuleModalOpen] = useState(false);
+  const [editingModule, setEditingModule] = useState(null);
+
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+
+  const [isEditNoteModalOpen, setIsEditNoteModalOpen] = useState(false);
+  const [editingNote, setEditingNote] = useState(null);
+
+  const [toast, setToast] = useState(null);
+  const showToast = (message, type = 'success') => setToast({ message, type });
+
+  const [confirmDialog, setConfirmDialog] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    isDestructive: true,
+    isBlocked: false,
+    blockedReason: '',
+    confirmText: 'Delete',
+    cancelText: 'Cancel',
+    onConfirm: null,
+    loading: false,
+  });
+
+  const closeConfirmDialog = () => {
+    setConfirmDialog((prev) => ({ ...prev, isOpen: false, loading: false }));
+  };
+
+  // Next module number for quick ordering
+  const nextModuleNumber = useMemo(() => {
+    if (!modules || modules.length === 0) return 1;
+    return Math.max(...modules.map((m) => m.number || 0)) + 1;
+  }, [modules]);
+
+  // --- Subject Actions ---
+  const handleCreateSubject = () => {
+    setEditingSubject(null);
+    setIsSubjectModalOpen(true);
+  };
+
+  const handleEditSubject = (subj) => {
+    setEditingSubject(subj);
+    setIsSubjectModalOpen(true);
+  };
+
+  const handleSubjectSuccess = (savedSubject, msg) => {
+    setIsSubjectModalOpen(false);
+    showToast(msg || 'Subject saved successfully');
+    loadSemesterData();
+    if (!editingSubject && savedSubject?._id) {
+      if (savedSubject.modules && savedSubject.modules.length > 0) {
+        navigate(`/notes/${savedSubject._id}/${savedSubject.modules[0]._id}`);
+      } else {
+        navigate(`/notes/${savedSubject._id}`);
+      }
+    }
+  };
+
+  const handleDeleteSubject = (subj) => {
+    const noteCount = getSubjectNoteCount(subj._id);
+    if (noteCount > 0) {
+      setConfirmDialog({
+        isOpen: true,
+        title: 'Cannot Delete Subject',
+        message: `Course "${subj.code} — ${subj.name}" currently contains ${noteCount} uploaded note${noteCount === 1 ? '' : 's'}.`,
+        isDestructive: false,
+        isBlocked: true,
+        blockedReason: `To avoid leaving orphaned study materials, subjects with active notes cannot be deleted. Please delete or reassign all ${noteCount} note${noteCount === 1 ? '' : 's'} under this course first.`,
+        confirmText: 'Understood',
+        cancelText: 'Close',
+        onConfirm: closeConfirmDialog,
+        loading: false,
+      });
+      return;
+    }
+
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Delete Subject',
+      message: `Are you sure you want to delete "${subj.code} — ${subj.name}"? This action is permanent and will also delete any syllabus modules attached to it.`,
+      isDestructive: true,
+      isBlocked: false,
+      blockedReason: '',
+      confirmText: 'Delete Subject',
+      cancelText: 'Cancel',
+      loading: false,
+      onConfirm: async () => {
+        try {
+          setConfirmDialog((prev) => ({ ...prev, loading: true }));
+          await apiFetch(`/subjects/${subj._id}`, { method: 'DELETE' });
+          closeConfirmDialog();
+          showToast(`Subject ${subj.code} deleted successfully`);
+          if (String(subjectId) === String(subj._id)) {
+            navigate('/notes');
+          }
+          loadSemesterData();
+        } catch (err) {
+          console.error('Failed to delete subject:', err);
+          closeConfirmDialog();
+          showToast(err.message || 'Failed to delete subject', 'error');
+        }
+      },
+    });
+  };
+
+  // --- Module Actions ---
+  const handleAddModule = () => {
+    setEditingModule(null);
+    setIsModuleModalOpen(true);
+  };
+
+  const handleEditModule = (mod) => {
+    setEditingModule(mod);
+    setIsModuleModalOpen(true);
+  };
+
+  const handleModuleSuccess = (savedMod, msg) => {
+    setIsModuleModalOpen(false);
+    showToast(msg || 'Module saved successfully');
+    fetchSubjectData();
+    if (!editingModule && savedMod?._id) {
+      navigate(`/notes/${subjectId}/${savedMod._id}`);
+    }
+  };
+
+  const handleDeleteModule = (mod) => {
+    const noteCount = getModuleNoteCount(mod._id);
+    if (noteCount > 0) {
+      setConfirmDialog({
+        isOpen: true,
+        title: 'Cannot Delete Module',
+        message: `Module ${mod.number}: "${mod.title}" contains ${noteCount} note${noteCount === 1 ? '' : 's'}.`,
+        isDestructive: false,
+        isBlocked: true,
+        blockedReason: `Deleting this module would leave ${noteCount} note${noteCount === 1 ? '' : 's'} orphaned. Please delete or reassign all notes in this module before removing it.`,
+        confirmText: 'Understood',
+        cancelText: 'Close',
+        onConfirm: closeConfirmDialog,
+        loading: false,
+      });
+      return;
+    }
+
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Delete Module',
+      message: `Are you sure you want to delete "Module ${mod.number}: ${mod.title}" from ${currentCourse?.code || 'this course'}?`,
+      isDestructive: true,
+      isBlocked: false,
+      blockedReason: '',
+      confirmText: 'Delete Module',
+      cancelText: 'Cancel',
+      loading: false,
+      onConfirm: async () => {
+        try {
+          setConfirmDialog((prev) => ({ ...prev, loading: true }));
+          await apiFetch(`/subjects/${subjectId}/modules/${mod._id}`, { method: 'DELETE' });
+          closeConfirmDialog();
+          showToast(`Module ${mod.number} deleted successfully`);
+          if (String(moduleId) === String(mod._id)) {
+            navigate(`/notes/${subjectId}`);
+          }
+          fetchSubjectData();
+        } catch (err) {
+          console.error('Failed to delete module:', err);
+          closeConfirmDialog();
+          showToast(err.message || 'Failed to delete module', 'error');
+        }
+      },
+    });
+  };
+
+  // --- Note Actions ---
+  const handleUploadNote = () => {
+    setIsUploadModalOpen(true);
+  };
+
+  const handleNoteUploadSuccess = (_savedNote, msg) => {
+    showToast(msg || 'Note uploaded successfully');
+    fetchSubjectData();
+    loadSemesterData();
+  };
+
+  const handleEditNote = (note) => {
+    setEditingNote(note);
+    setIsEditNoteModalOpen(true);
+  };
+
+  const handleNoteEditSuccess = (_savedNote, msg) => {
+    showToast(msg || 'Note updated successfully');
+    fetchSubjectData();
+    loadSemesterData();
+  };
+
+  const handleDeleteNote = (note) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Delete Study Note',
+      message: `Are you sure you want to delete "${note.title}"? The associated file will be permanently removed from storage.`,
+      isDestructive: true,
+      isBlocked: false,
+      blockedReason: '',
+      confirmText: 'Delete Note',
+      cancelText: 'Cancel',
+      loading: false,
+      onConfirm: async () => {
+        try {
+          setConfirmDialog((prev) => ({ ...prev, loading: true }));
+          await apiFetch(`/notes/${note._id}`, { method: 'DELETE' });
+          closeConfirmDialog();
+          showToast('Note deleted successfully');
+          fetchSubjectData();
+          loadSemesterData();
+        } catch (err) {
+          console.error('Failed to delete note:', err);
+          closeConfirmDialog();
+          showToast(err.message || 'Failed to delete note', 'error');
+        }
+      },
+    });
+  };
 
   // Navigation handlers update URL as the single source of truth
   const handleSelectSubject = (newSubjectId) => {
@@ -293,6 +528,10 @@ export const NotesBrowser = () => {
           semester={semester}
           getSubjectNoteCount={getSubjectNoteCount}
           onKeyDownNav={handleKeyDownNav}
+          isAdmin={isAdmin}
+          onCreateSubject={handleCreateSubject}
+          onEditSubject={handleEditSubject}
+          onDeleteSubject={handleDeleteSubject}
           className={subjectId ? 'hidden lg:flex' : 'flex'}
         />
 
@@ -308,6 +547,10 @@ export const NotesBrowser = () => {
           onRetry={fetchSubjectData}
           getModuleNoteCount={getModuleNoteCount}
           onKeyDownNav={handleKeyDownNav}
+          isAdmin={isAdmin}
+          onAddModule={handleAddModule}
+          onEditModule={handleEditModule}
+          onDeleteModule={handleDeleteModule}
           className={moduleId ? 'hidden lg:flex' : subjectId ? 'flex' : 'hidden lg:flex'}
         />
 
@@ -320,9 +563,69 @@ export const NotesBrowser = () => {
           error={null}
           onRetry={fetchSubjectData}
           onKeyDownNav={handleKeyDownNav}
+          isAdmin={isAdmin}
+          onUploadNote={handleUploadNote}
+          onEditNote={handleEditNote}
+          onDeleteNote={handleDeleteNote}
           className={moduleId ? 'flex' : 'hidden lg:flex'}
         />
       </div>
+
+      {/* Admin Modals */}
+      {isAdmin && (
+        <>
+          <SubjectFormModal
+            isOpen={isSubjectModalOpen}
+            onClose={() => setIsSubjectModalOpen(false)}
+            semester={semester}
+            initialData={editingSubject}
+            onSuccess={handleSubjectSuccess}
+          />
+
+          <ModuleFormModal
+            isOpen={isModuleModalOpen}
+            onClose={() => setIsModuleModalOpen(false)}
+            subjectId={subjectId}
+            subjectCode={currentCourse?.code}
+            initialData={editingModule}
+            nextModuleNumber={nextModuleNumber}
+            onSuccess={handleModuleSuccess}
+          />
+
+          <UploadNoteModal
+            isOpen={isUploadModalOpen}
+            onClose={() => setIsUploadModalOpen(false)}
+            subject={currentCourse}
+            module={currentModule}
+            semester={semester}
+            onSuccess={handleNoteUploadSuccess}
+          />
+
+          <EditNoteModal
+            isOpen={isEditNoteModalOpen}
+            onClose={() => setIsEditNoteModalOpen(false)}
+            note={editingNote}
+            onSuccess={handleNoteEditSuccess}
+          />
+
+          <ConfirmDialog
+            isOpen={confirmDialog.isOpen}
+            title={confirmDialog.title}
+            message={confirmDialog.message}
+            isDestructive={confirmDialog.isDestructive}
+            isBlocked={confirmDialog.isBlocked}
+            blockedReason={confirmDialog.blockedReason}
+            confirmText={confirmDialog.confirmText}
+            cancelText={confirmDialog.cancelText}
+            loading={confirmDialog.loading}
+            onConfirm={confirmDialog.onConfirm}
+            onClose={closeConfirmDialog}
+          />
+        </>
+      )}
+
+      {/* Feedback Toast */}
+      <Toast toast={toast} onClose={() => setToast(null)} />
     </div>
   );
 };

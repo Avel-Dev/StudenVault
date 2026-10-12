@@ -1,5 +1,6 @@
 const Subject = require('../models/Subject');
 const Module = require('../models/Module');
+const Note = require('../models/Note');
 
 // @route GET /api/subjects
 exports.getSubjects = async (req, res, next) => {
@@ -36,7 +37,7 @@ exports.getSubjectById = async (req, res, next) => {
 // @route POST /api/subjects
 exports.createSubject = async (req, res, next) => {
   try {
-    const { name, code, semester, description, faculty } = req.body;
+    const { name, code, semester, description, faculty, modules } = req.body;
     const subject = await Subject.create({
       name,
       code,
@@ -44,7 +45,25 @@ exports.createSubject = async (req, res, next) => {
       description,
       faculty: faculty || req.user._id,
     });
-    res.status(201).json({ success: true, subject });
+
+    // If modules were included in payload, create them
+    if (Array.isArray(modules) && modules.length > 0) {
+      for (const m of modules) {
+        if (m.title && m.number) {
+          await Module.create({
+            subject: subject._id,
+            number: Number(m.number),
+            title: m.title.trim(),
+            topics: Array.isArray(m.topics)
+              ? m.topics
+              : (m.topics ? String(m.topics).split(',').map((t) => t.trim()).filter(Boolean) : []),
+          });
+        }
+      }
+    }
+
+    const createdModules = await Module.find({ subject: subject._id }).sort({ number: 1 });
+    res.status(201).json({ success: true, subject, modules: createdModules });
   } catch (err) {
     next(err);
   }
@@ -69,6 +88,15 @@ exports.updateSubject = async (req, res, next) => {
 // @route DELETE /api/subjects/:id
 exports.deleteSubject = async (req, res, next) => {
   try {
+    // If delete would orphan notes, block deletion with a message instead of leaving orphans
+    const noteCount = await Note.countDocuments({ subject: req.params.id });
+    if (noteCount > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot delete this subject because it contains ${noteCount} note(s). Please remove all notes under this subject first.`,
+      });
+    }
+
     const subject = await Subject.findByIdAndDelete(req.params.id);
     if (!subject) {
       return res.status(404).json({ success: false, message: 'Subject not found' });
@@ -135,6 +163,15 @@ exports.updateModule = async (req, res, next) => {
 // @route DELETE /api/subjects/:subjectId/modules/:moduleId
 exports.deleteModule = async (req, res, next) => {
   try {
+    // If delete would orphan notes, block deletion with a message instead of leaving orphans
+    const noteCount = await Note.countDocuments({ module: req.params.moduleId });
+    if (noteCount > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot delete this module because it contains ${noteCount} note(s). Please remove all notes under this module first.`,
+      });
+    }
+
     const mod = await Module.findByIdAndDelete(req.params.moduleId);
     if (!mod) {
       return res.status(404).json({ success: false, message: 'Module not found' });

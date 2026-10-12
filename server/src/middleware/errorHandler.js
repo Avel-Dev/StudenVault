@@ -29,6 +29,18 @@ const errorHandler = (err, req, res, next) => {
 
   // Mongoose duplicate key error
   if (err.code === 11000) {
+    if (err.keyPattern && err.keyPattern.code && err.keyPattern.semester) {
+      return res.status(400).json({
+        success: false,
+        message: 'A subject with this course code already exists in this semester.',
+      });
+    }
+    if (err.keyPattern && err.keyPattern.subject && err.keyPattern.number) {
+      return res.status(400).json({
+        success: false,
+        message: 'A module with this module number already exists in this subject.',
+      });
+    }
     const field = Object.keys(err.keyValue || {})[0] || 'field';
     const message = `Duplicate entry for ${field}. Please use another value.`;
     return res.status(400).json({ success: false, message });

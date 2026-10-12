@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   FileText,
   Search,
@@ -6,6 +6,10 @@ import {
   AlertCircle,
   RefreshCw,
   FolderOpen,
+  Plus,
+  MoreVertical,
+  Edit2,
+  Trash2,
 } from 'lucide-react';
 
 export const NotesPane = ({
@@ -16,11 +20,27 @@ export const NotesPane = ({
   error,
   onRetry,
   onKeyDownNav,
+  isAdmin = false,
+  onUploadNote,
+  onEditNote,
+  onDeleteNote,
   className = '',
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [examTypeFilter, setExamTypeFilter] = useState('all'); // 'all', 'midterm', 'endsem'
+  const [activeMenuId, setActiveMenuId] = useState(null);
   const noteRefs = useRef([]);
+
+  // Close overflow menu on click outside
+  useEffect(() => {
+    const handleOutsideClick = (e) => {
+      if (!e.target.closest('[data-overflow-menu]')) {
+        setActiveMenuId(null);
+      }
+    };
+    window.addEventListener('click', handleOutsideClick);
+    return () => window.removeEventListener('click', handleOutsideClick);
+  }, []);
 
   // Client-side filtering
   const filteredNotes = useMemo(() => {
@@ -86,11 +106,23 @@ export const NotesPane = ({
             {currentModule ? `Notes — ${currentModule.title}` : 'Notes'}
           </h2>
         </div>
-        {currentModule && (
-          <span className="text-[11px] font-semibold text-[#2F3E4A]/60 shrink-0">
-            {filteredNotes.length} {filteredNotes.length === 1 ? 'resource' : 'resources'}
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {currentModule && (
+            <span className="text-[11px] font-semibold text-[#2F3E4A]/60 shrink-0">
+              {filteredNotes.length} {filteredNotes.length === 1 ? 'resource' : 'resources'}
+            </span>
+          )}
+          {isAdmin && moduleId && (
+            <button
+              type="button"
+              onClick={onUploadNote}
+              className="inline-flex items-center gap-1 text-[11px] font-bold text-[#8C966D] hover:text-[#2F3E4A] hover:bg-[#E4E4D4]/70 px-2 py-0.5 rounded-md transition-colors cursor-pointer border border-[#D6D6C2]/60"
+            >
+              <Plus className="w-3 h-3" />
+              <span>Upload note</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Pane Controls (Search & Exam Segmented Filter) */}
@@ -190,16 +222,28 @@ export const NotesPane = ({
             </button>
           </div>
         ) : filteredNotes.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center p-8 text-center text-xs text-[#2F3E4A]/60 space-y-1">
+          <div className="h-full flex flex-col items-center justify-center p-8 text-center text-xs text-[#2F3E4A]/70 space-y-2">
             <FileText className="w-6 h-6 text-[#A9B28C] opacity-70" />
             <p className="font-semibold text-[#2F3E4A]">
-              {notes.length === 0 ? 'No notes in this module yet' : 'No notes match your filter'}
-            </p>
-            <p>
               {notes.length === 0
-                ? 'Faculty has not uploaded notes for this module yet.'
+                ? (isAdmin ? 'No notes in this module yet. Upload the first note.' : 'No notes in this module yet')
+                : 'No notes match your filter'}
+            </p>
+            <p className="text-[11px] text-[#2F3E4A]/60">
+              {notes.length === 0
+                ? (isAdmin ? 'Share lecture slides, reference guides, or question banks.' : 'Faculty has not uploaded notes for this module yet.')
                 : 'Try clearing the search query or exam type filter.'}
             </p>
+            {isAdmin && notes.length === 0 && (
+              <button
+                type="button"
+                onClick={onUploadNote}
+                className="mt-1 inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#8C966D] hover:bg-[#788258] text-white text-xs font-bold transition-all shadow-xs"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Upload Note</span>
+              </button>
+            )}
           </div>
         ) : (
           <div className="divide-y divide-[#D6D6C2]/60 rounded-lg border border-[#D6D6C2] bg-[#FAF9F0] overflow-hidden">
@@ -207,6 +251,7 @@ export const NotesPane = ({
               const fileTypeBadge = getCleanFileType(note.fileType, note.fileUrl);
               const dateStr = formatDate(note.createdAt);
               const isMidterm = note.examType === 'midterm';
+              const isMenuOpen = activeMenuId === note._id;
 
               return (
                 <div
@@ -250,8 +295,8 @@ export const NotesPane = ({
                     </div>
                   </div>
 
-                  {/* Open action on the right */}
-                  <div className="shrink-0">
+                  {/* Actions on the right */}
+                  <div className="shrink-0 flex items-center gap-1.5">
                     <a
                       href={note.fileUrl}
                       target="_blank"
@@ -262,6 +307,55 @@ export const NotesPane = ({
                       <span>Open</span>
                       <Download className="w-3 h-3 opacity-70" />
                     </a>
+
+                    {/* Admin Overflow Menu Button */}
+                    {isAdmin && (
+                      <div className="relative" data-overflow-menu>
+                        <button
+                          type="button"
+                          aria-label={`Actions for note ${note.title}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveMenuId(isMenuOpen ? null : note._id);
+                          }}
+                          className={`p-1 rounded-md text-[#2F3E4A]/50 hover:text-[#2F3E4A] hover:bg-[#E4E4D4] transition-colors ${
+                            isMenuOpen ? 'bg-[#E4E4D4] text-[#2F3E4A]' : 'opacity-0 group-hover:opacity-100 focus:opacity-100'
+                          }`}
+                        >
+                          <MoreVertical className="w-3.5 h-3.5" />
+                        </button>
+
+                        {/* Dropdown Menu */}
+                        {isMenuOpen && (
+                          <div className="absolute right-0 top-full mt-1 w-32 rounded-xl bg-[#FAF9F0] border border-[#D6D6C2] shadow-xl py-1 z-30 animate-in fade-in zoom-in-95 duration-100">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveMenuId(null);
+                                onEditNote(note);
+                              }}
+                              className="w-full text-left px-3 py-1.5 text-xs text-[#2F3E4A] hover:bg-[#C0D5C3]/40 flex items-center gap-2 font-medium"
+                            >
+                              <Edit2 className="w-3.5 h-3.5 text-[#8C966D]" />
+                              <span>Edit</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveMenuId(null);
+                                onDeleteNote(note);
+                              }}
+                              className="w-full text-left px-3 py-1.5 text-xs text-[#C48E5A] hover:bg-[#C48E5A]/15 flex items-center gap-2 font-medium"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Delete</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               );

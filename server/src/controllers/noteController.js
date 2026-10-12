@@ -111,6 +111,32 @@ exports.createNote = async (req, res, next) => {
   }
 };
 
+// @route PUT /api/notes/:id
+exports.updateNote = async (req, res, next) => {
+  try {
+    const { title, examType } = req.body;
+    const updateData = {};
+    if (title) updateData.title = title.trim();
+    if (examType) updateData.examType = examType.toLowerCase();
+
+    const note = await Note.findByIdAndUpdate(req.params.id, updateData, {
+      new: true,
+      runValidators: true,
+    })
+      .populate('subject', 'name code semester')
+      .populate('module', 'number title')
+      .populate('uploadedBy', 'name email');
+
+    if (!note) {
+      return res.status(404).json({ success: false, message: 'Note not found' });
+    }
+
+    res.json({ success: true, note });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // @route DELETE /api/notes/:id
 exports.deleteNote = async (req, res, next) => {
   try {
