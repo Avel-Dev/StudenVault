@@ -22,7 +22,8 @@ export const Navbar = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [switchingRole, setSwitchingRole] = useState(false);
 
-  const isActive = (path) => location.pathname === path;
+  const isActive = (path) =>
+    location.pathname === path || (path === '/notes' && location.pathname.startsWith('/notes'));
 
   const handleRoleToggle = async () => {
     if (!isDev || switchingRole) return;

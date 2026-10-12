@@ -5,7 +5,7 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { Login } from './pages/Auth/Login';
 import { Register } from './pages/Auth/Register';
 import { StudentDashboard } from './pages/Student/Dashboard';
-import { NotesLibrary } from './pages/Student/NotesLibrary';
+import { NotesBrowser } from './pages/Student/NotesLibrary';
 import { StudentLectures } from './pages/Student/Lectures';
 import { StudentAttendance } from './pages/Student/Attendance';
 import { AdminPlaceholder } from './pages/Admin/AdminPlaceholder';
@@ -23,7 +23,10 @@ export function App() {
           <Route element={<ProtectedRoute />}>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<StudentDashboard />} />
-            <Route path="/notes" element={<NotesLibrary />} />
+
+            {/* Single persistent route for Notes Library */}
+            <Route path="/notes/*" element={<NotesBrowser />} />
+
             <Route path="/lectures" element={<StudentLectures />} />
             <Route path="/attendance" element={<StudentAttendance />} />
             <Route path="/admin" element={<AdminPlaceholder />} />
