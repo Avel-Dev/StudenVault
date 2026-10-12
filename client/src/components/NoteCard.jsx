@@ -1,7 +1,8 @@
 import React from 'react';
-import { FileText, Download, ExternalLink, Calendar, BookOpen, Layers } from 'lucide-react';
+import { Download, BookOpen, Layers } from 'lucide-react';
 
-export const NoteCard = ({ note, onDelete }) => {
+export const NoteCard = ({ note, onDelete, variant = 'default' }) => {
+  const isDashboard = variant === 'dashboard';
   const isMidterm = note.examType === 'midterm';
 
   const formatFileSize = (bytes) => {
@@ -20,23 +21,29 @@ export const NoteCard = ({ note, onDelete }) => {
   };
 
   return (
-    <div className="bg-[#E4E4D4]/90 rounded-3xl p-5 border border-[#D6D6C2] hover:border-[#A9B28C] transition-lift flex flex-col justify-between shadow-xs">
+    <div
+      className={`${
+        isDashboard ? 'bg-[#FAF9F0]' : 'bg-[#E4E4D4]/90'
+      } rounded-3xl p-5 border border-[#D6D6C2] hover:border-[#A9B28C] transition-lift flex flex-col justify-between h-full shadow-xs hover:shadow-md`}
+    >
       <div>
-        {/* Top Badges */}
-        <div className="flex items-center justify-between gap-2 mb-3">
-          <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-[#C0D5C3] text-[#2F3E4A]">
-            {note.subject?.code || 'GEN'} • Sem {note.semester}
-          </span>
-          <span
-            className={`text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full ${
-              isMidterm
-                ? 'bg-[#C48E5A]/20 text-[#C48E5A] border border-[#C48E5A]/30'
-                : 'bg-[#A9B28C]/30 text-[#2F3E4A] border border-[#A9B28C]/40'
-            }`}
-          >
-            {isMidterm ? 'Midterm Exam' : 'End Semester'}
-          </span>
-        </div>
+        {/* Top Badges (omitted for dashboard variant) */}
+        {!isDashboard && (
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-[#C0D5C3] text-[#2F3E4A]">
+              {note.subject?.code || 'GEN'} • Sem {note.semester}
+            </span>
+            <span
+              className={`text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full ${
+                isMidterm
+                  ? 'bg-[#C48E5A]/20 text-[#C48E5A] border border-[#C48E5A]/30'
+                  : 'bg-[#A9B28C]/30 text-[#2F3E4A] border border-[#A9B28C]/40'
+              }`}
+            >
+              {isMidterm ? 'Midterm Exam' : 'End Semester'}
+            </span>
+          </div>
+        )}
 
         {/* Note Title */}
         <h3 className="font-heading text-lg font-bold text-[#2F3E4A] mb-2 line-clamp-2 leading-snug">
