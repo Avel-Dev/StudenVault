@@ -1,0 +1,57 @@
+@import "tailwindcss";
+
+@theme {
+  --color-cream: #E4E4D4;
+  --color-cream-light: #F4F4EB;
+  --color-cream-dark: #D6D6C2;
+  --color-sage: #C0D5C3;
+  --color-sage-light: #D5E4D7;
+  --color-sage-dark: #A5C0A9;
+  --color-olive: #A9B28C;
+  --color-olive-dark: #8C966D;
+  --color-slate: #2F3E4A;
+  --color-slate-light: #445868;
+  --color-slate-muted: #647585;
+  --color-caramel: #C48E5A;
+  --color-caramel-hover: #B27B47;
+  --color-mustard: #D4A93C;
+  --color-mustard-hover: #BF942B;
+
+  --font-heading: 'Fredoka', cursive, sans-serif;
+  --font-sans: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+body {
+  background-color: var(--color-cream);
+  color: var(--color-slate);
+  font-family: var(--font-sans);
+  min-height: 100vh;
+}
+
+h1, h2, h3, h4, h5, h6, .font-heading {
+  font-family: var(--font-heading);
+}
+
+/* Custom scrollbars that match the calm aesthetic */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #E4E4D4;
+}
+::-webkit-scrollbar-thumb {
+  background: #C0D5C3;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #A9B28C;
+}
+
+/* Smooth transitions */
+.transition-lift {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.transition-lift:hover {
+  transform: translateY(-2px);
+}
